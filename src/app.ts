@@ -1,29 +1,92 @@
 import express from 'express';
-import cors from 'cors';
+import type {
+    Request,
+    Response,
+    NextFunction
+} from 'express';
 
-import apiRoutes from './routes/index';
+import cors from 'cors';
+import { randomUUID } from 'crypto';
+
+import routes from './routes/index.js';
+
+import {
+    sendSuccess,
+    sendError
+} from './utils/response.js';
 
 const app = express();
 
-app.use(cors());
+app.use(
+    cors({
+        exposedHeaders: ['X-Request-Id']
+    })
+);
 
 app.use(express.json());
 
-app.get('/', (req, res) => {
-    res.status(200).json({
-        success: true,
-        message: 'Backend Todo Praktikum Berjalan Mulus!'
-    });
+// Membuat X-Request-Id untuk setiap request
+app.use((req, res, next) => {
+    const requestId = randomUUID();
+
+    res.locals.requestId = requestId;
+
+    res.setHeader(
+        'X-Request-Id',
+        requestId
+    );
+
+    next();
 });
 
-app.use('/api', apiRoutes);
+// Logging request berdasarkan X-Request-Id
+app.use((req, res, next) => {
+    console.log(
+        `[${res.locals.requestId}] ${req.method} ${req.originalUrl}`
+    );
+
+    next();
+});
+
+// Route utama
+app.get('/', (req, res) => {
+    sendSuccess(
+        res,
+        'Backend Todo Praktikum Berjalan Mulus!'
+    );
+});
+
+// Semua route API
+app.use('/api', routes);
 
 // 404 Handler
-app.use((req, res) => {
-    res.status(404).json({
-        success: false,
-        message: 'Endpoint tidak ditemukan!'
-    });
+app.use((req: Request, res: Response) => {
+    sendError(
+        res,
+        `Route ${req.method} ${req.url} tidak ditemukan!`,
+        404
+    );
 });
+
+// Global Error Handler
+app.use(
+    (
+        err: Error,
+        req: Request,
+        res: Response,
+        next: NextFunction
+    ) => {
+        console.error(
+            'Terjadi error:',
+            err.message
+        );
+
+        sendError(
+            res,
+            'Terjadi kesalahan pada server.',
+            500
+        );
+    }
+);
 
 export default app;

@@ -1,108 +1,130 @@
-import { Request, Response, NextFunction } from 'express';
+import type {
+    Request,
+    Response,
+    NextFunction
+} from 'express';
 
-// Validasi Register
+import type {
+    RegisterRequest,
+    LoginRequest
+} from '../types/auth.js';
+
+import type {
+    CreateTodoRequest,
+    UpdateTodoRequest
+} from '../types/todo.js';
+
+import {
+    sendError
+} from '../utils/response.js';
+
 export const validateRegister = (
     req: Request,
     res: Response,
     next: NextFunction
 ): void => {
-    const { username, email, password } = req.body;
+    const payload =
+        req.body as RegisterRequest;
 
-    if (!username || !email || !password) {
-        res.status(400).json({
-            success: false,
-            message: 'Username, email, dan password wajib diisi!'
-        });
+    if (
+        !payload.username ||
+        !payload.email ||
+        !payload.password
+    ) {
+        sendError(
+            res,
+            'Username, email, dan password wajib diisi!',
+            400
+        );
         return;
     }
 
-    if (!email.includes('@')) {
-        res.status(400).json({
-            success: false,
-            message: 'Format email tidak valid!'
-        });
+    if (!payload.email.includes('@')) {
+        sendError(
+            res,
+            'Format email tidak valid!',
+            400
+        );
         return;
     }
 
     next();
 };
 
-
-// Validasi Login
 export const validateLogin = (
     req: Request,
     res: Response,
     next: NextFunction
 ): void => {
-    const { username, password } = req.body;
+    const payload =
+        req.body as LoginRequest;
 
-    if (!username || !password) {
-        res.status(400).json({
-            success: false,
-            message: 'Username dan password wajib diisi!'
-        });
+    if (
+        !payload.username ||
+        !payload.password
+    ) {
+        sendError(
+            res,
+            'Username dan password wajib diisi!',
+            400
+        );
         return;
     }
 
     next();
 };
 
-
-// Validasi Create Todo
 export const validateTodo = (
     req: Request,
     res: Response,
     next: NextFunction
 ): void => {
-    const { task } = req.body;
+    const payload =
+        req.body as CreateTodoRequest;
 
-    if (!task || typeof task !== 'string') {
-        res.status(400).json({
-            success: false,
-            message: 'Task wajib diisi dengan format string!'
-        });
+    if (
+        !payload.task ||
+        typeof payload.task !== 'string'
+    ) {
+        sendError(
+            res,
+            'Task wajib diisi!',
+            400
+        );
         return;
     }
 
     next();
 };
 
-
-// Validasi Update Todo
 export const validateUpdateTodo = (
     req: Request,
     res: Response,
     next: NextFunction
 ): void => {
-    const { task, is_completed } = req.body;
+    const payload =
+        req.body as UpdateTodoRequest;
 
-    // Minimal salah satu field harus dikirim
-    if (task === undefined && is_completed === undefined) {
-        res.status(400).json({
-            success: false,
-            message: 'Isi minimal task atau is_completed!'
-        });
-        return;
-    }
-
-    // Jika task dikirim, harus berupa string
-    if (task !== undefined && typeof task !== 'string') {
-        res.status(400).json({
-            success: false,
-            message: 'Task harus berupa string!'
-        });
-        return;
-    }
-
-    // Jika is_completed dikirim, harus berupa boolean
     if (
-        is_completed !== undefined &&
-        typeof is_completed !== 'boolean'
+        !payload.task ||
+        typeof payload.task !== 'string'
     ) {
-        res.status(400).json({
-            success: false,
-            message: 'is_completed harus berupa true atau false!'
-        });
+        sendError(
+            res,
+            'Task wajib diisi!',
+            400
+        );
+        return;
+    }
+
+    if (
+        typeof payload.is_completed !== 'boolean'
+    ) {
+        sendError(
+            res,
+            'is_completed harus berupa boolean!',
+            400
+        );
         return;
     }
 

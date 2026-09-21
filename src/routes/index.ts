@@ -1,23 +1,13 @@
 import { Router } from 'express';
 
-import authRoutes from './authRoutes';
-import todoRoutes from './todoRoutes';
+import authRoutes from './authRoutes.js';
 
-import { verifyToken } from '../middlewares/authMiddleware';
+import todoRoutes from './todoRoutes.js';
 
 const router = Router();
 
-// Route authentication
-router.use(
-    '/auth',
-    authRoutes
-);
+router.use('/auth', authRoutes);
 
-// Route todo membutuhkan token
-router.use(
-    '/todos',
-    verifyToken,
-    todoRoutes
-);
+router.use('/todos', todoRoutes);
 
-export default router; 
+export default router;

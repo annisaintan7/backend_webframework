@@ -6,44 +6,48 @@ import {
     createTodo,
     updateTodo,
     deleteTodo
-} from '../controllers/todoController';
+} from '../controllers/todoController.js';
 
 import {
     validateTodo,
     validateUpdateTodo
-} from '../middlewares/validator';
+} from '../middlewares/validator.js';
+
+import {
+    verifyToken
+} from '../middlewares/authMiddleware.js';
 
 const router = Router();
 
-// GET /api/todos
 router.get(
     '/',
+    verifyToken,
     getTodos
 );
 
-// GET /api/todos/:id
 router.get(
     '/:id',
+    verifyToken,
     getTodoById
 );
 
-// POST /api/todos
 router.post(
     '/',
+    verifyToken,
     validateTodo,
     createTodo
 );
 
-// PUT /api/todos/:id
 router.put(
     '/:id',
+    verifyToken,
     validateUpdateTodo,
     updateTodo
 );
 
-// DELETE /api/todos/:id
 router.delete(
     '/:id',
+    verifyToken,
     deleteTodo
 );
 

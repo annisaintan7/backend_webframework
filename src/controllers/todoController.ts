@@ -1,174 +1,357 @@
-import { Request, Response } from 'express';
-import { TodoModel } from '../models/todoModel';
+import type {
+    Request,
+    Response
+} from 'express';
 
-// GET /api/todos
-// Ambil semua todo milik user yang sedang login
+import {
+    TodoModel
+} from '../models/todoModel.js';
+
+import type {
+    CreateTodoRequest,
+    UpdateTodoRequest,
+    TodoResponse,
+    TodoRow
+} from '../types/todo.js';
+
+import type {
+    PaginationMeta
+} from '../types/common.js';
+
+import {
+    sendSuccess,
+    sendSuccessPagination,
+    sendError
+} from '../utils/response.js';
+
+
+// Helper pagination
+const parsePositiveInt = (
+    value: unknown,
+    fallback: number
+): number => {
+    const parsed = Number(value);
+
+    if (
+        Number.isInteger(parsed) &&
+        parsed > 0
+    ) {
+        return parsed;
+    }
+
+    return fallback;
+};
+
+
+// GET /todos
 export const getTodos = async (
     req: Request,
     res: Response
 ): Promise<void> => {
+
     const userId = res.locals.userId;
 
-    try {
-        const todos = await TodoModel.getByUserId(userId);
+    const page = parsePositiveInt(
+        req.query.page,
+        1
+    );
 
-        res.status(200).json({
-            success: true,
-            data: todos
-        });
+    const perPage = Math.min(
+        parsePositiveInt(
+            req.query.perPage,
+            10
+        ),
+        50
+    );
+
+    const offset =
+        (page - 1) * perPage;
+
+    try {
+
+        const todos =
+            await TodoModel.getByUserId(
+                userId,
+                perPage,
+                offset
+            );
+
+        const total =
+            await TodoModel.countByUserId(
+                userId
+            );
+
+        const data: TodoResponse[] =
+            (todos as TodoRow[]).map(
+                (todo) => ({
+                    id: todo.id,
+                    todo: todo.task,
+                    completed:
+                        Boolean(
+                            todo.is_completed
+                        )
+                })
+            );
+
+        const pagination: PaginationMeta = {
+            page,
+            perPage,
+            total,
+            totalPages:
+                Math.ceil(
+                    total / perPage
+                )
+        };
+
+        sendSuccessPagination(
+            res,
+            'Data todo berhasil diambil!',
+            data,
+            pagination
+        );
+
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Gagal mengambil data.'
-        });
+
+        console.error(error);
+
+        sendError(
+            res,
+            'Gagal mengambil data todo.',
+            500
+        );
     }
 };
 
 
-// GET /api/todos/:id
-// Ambil satu todo berdasarkan ID
+// GET /todos/:id
 export const getTodoById = async (
     req: Request,
     res: Response
 ): Promise<void> => {
-    const { id } = req.params;
+
+    const id = Number(
+        req.params.id
+    );
+
     const userId = res.locals.userId;
 
-    try {
-        const todo = await TodoModel.getById(
-            Number(id),
-            userId
+    if (Number.isNaN(id)) {
+        sendError(
+            res,
+            'ID todo tidak valid.',
+            400
         );
+        return;
+    }
 
-        // Jika todo tidak ditemukan atau bukan milik user
+    try {
+
+        const todo =
+            await TodoModel.getById(
+                id,
+                userId
+            );
+
         if (!todo) {
-            res.status(404).json({
-                success: false,
-                message: 'Tugas tidak ditemukan!'
-            });
+            sendError(
+                res,
+                'Todo tidak ditemukan.',
+                404
+            );
             return;
         }
 
-        res.status(200).json({
-            success: true,
-            data: todo
-        });
+        const row =
+            todo as TodoRow;
+
+        const data: TodoResponse = {
+            id: row.id,
+            todo: row.task,
+            completed:
+                Boolean(
+                    row.is_completed
+                )
+        };
+
+        sendSuccess(
+            res,
+            'Todo berhasil diambil!',
+            data
+        );
+
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Gagal mengambil data.'
-        });
+
+        console.error(error);
+
+        sendError(
+            res,
+            'Gagal mengambil todo.',
+            500
+        );
     }
 };
 
 
-// POST /api/todos
-// Tambah todo baru
+// POST /todos
 export const createTodo = async (
     req: Request,
     res: Response
 ): Promise<void> => {
-    const { task } = req.body;
-    const userId = res.locals.userId;
+
+    const payload =
+        req.body as CreateTodoRequest;
+
+    const userId =
+        res.locals.userId;
 
     try {
-        const newId = await TodoModel.create(
-            userId,
-            task
+
+        const newId =
+            await TodoModel.create(
+                userId,
+                payload.task
+            );
+
+        const data: TodoResponse = {
+            id: newId,
+            todo: payload.task,
+            completed: false
+        };
+
+        sendSuccess(
+            res,
+            'Todo berhasil ditambahkan!',
+            data,
+            201
         );
 
-        res.status(201).json({
-            success: true,
-            message: 'Tugas berhasil ditambahkan',
-            data: {
-                id: newId,
-                task,
-                is_completed: false
-            }
-        });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Gagal menambahkan tugas.'
-        });
+
+        console.error(error);
+
+        sendError(
+            res,
+            'Gagal menambahkan todo.',
+            500
+        );
     }
 };
 
 
-// PUT /api/todos/:id
-// Update task atau status selesai
+// PUT /todos/:id
 export const updateTodo = async (
     req: Request,
     res: Response
 ): Promise<void> => {
-    const { id } = req.params;
-    const { task, is_completed } = req.body;
-    const userId = res.locals.userId;
+
+    const id = Number(
+        req.params.id
+    );
+
+    const userId =
+        res.locals.userId;
+
+    const payload =
+        req.body as UpdateTodoRequest;
+
+    if (Number.isNaN(id)) {
+        sendError(
+            res,
+            'ID todo tidak valid.',
+            400
+        );
+        return;
+    }
 
     try {
-        const affectedRows = await TodoModel.update(
-            Number(id),
-            task,
-            is_completed,
-            userId
-        );
 
-        // Jika affectedRows = 0,
-        // berarti todo tidak ditemukan atau bukan milik user
+        const affectedRows =
+            await TodoModel.update(
+                id,
+                userId,
+                payload.task,
+                payload.is_completed
+            );
+
         if (affectedRows === 0) {
-            res.status(404).json({
-                success: false,
-                message: 'Tugas tidak ditemukan!'
-            });
+            sendError(
+                res,
+                'Todo tidak ditemukan.',
+                404
+            );
             return;
         }
 
-        res.status(200).json({
-            success: true,
-            message: 'Tugas berhasil diperbarui!'
-        });
+        sendSuccess(
+            res,
+            'Todo berhasil diperbarui!'
+        );
+
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Gagal memperbarui tugas.'
-        });
+
+        console.error(error);
+
+        sendError(
+            res,
+            'Gagal memperbarui todo.',
+            500
+        );
     }
 };
 
 
-// DELETE /api/todos/:id
-// Hapus todo
+// DELETE /todos/:id
 export const deleteTodo = async (
     req: Request,
     res: Response
 ): Promise<void> => {
-    const { id } = req.params;
-    const userId = res.locals.userId;
+
+    const id = Number(
+        req.params.id
+    );
+
+    const userId =
+        res.locals.userId;
+
+    if (Number.isNaN(id)) {
+        sendError(
+            res,
+            'ID todo tidak valid.',
+            400
+        );
+        return;
+    }
 
     try {
-        const affectedRows = await TodoModel.delete(
-            Number(id),
-            userId
-        );
 
-        // Jika affectedRows = 0,
-        // berarti todo tidak ditemukan atau bukan milik user
+        const affectedRows =
+            await TodoModel.delete(
+                id,
+                userId
+            );
+
         if (affectedRows === 0) {
-            res.status(404).json({
-                success: false,
-                message: 'Tugas tidak ditemukan!'
-            });
+            sendError(
+                res,
+                'Todo tidak ditemukan.',
+                404
+            );
             return;
         }
 
-        res.status(200).json({
-            success: true,
-            message: 'Tugas berhasil dihapus!'
-        });
+        sendSuccess(
+            res,
+            'Todo berhasil dihapus!'
+        );
+
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Gagal menghapus tugas.'
-        });
+
+        console.error(error);
+
+        sendError(
+            res,
+            'Gagal menghapus todo.',
+            500
+        );
     }
 };
